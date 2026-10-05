@@ -8,3 +8,4 @@ _site/
 .env
 .cursor/mcp.json
 .DS_Store
+snowflake/data/
