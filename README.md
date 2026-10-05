@@ -60,8 +60,11 @@ The LLM never writes SQL. It can only fill a JSON schema whose enums are the cer
 | `src/throughline/data_gen.py` | Seeded synthetic data (760 order lines, 8 suppliers, 16 parts, 4 plants, 7 carriers, 10 customers, inventory snapshot) |
 | `web/` | The prototype: `engine.js` (same model in the browser) + `index.src.html`; `build.py` produces `index.html` |
 | `.cursor/`, `.vscode/` | Cursor rules, MCP config template, run/debug configurations |
-| `scripts/` | `run.sh` / `run.ps1` one-shot setup and run, `publish.sh` GitHub publish |
+| `scripts/` | `run.sh` / `run.ps1` one-shot setup and run, `export_csv.py` for the Snowflake load, `publish.sh` GitHub publish |
 | `tests/` | Persona consistency, governance guards, and browser-vs-DuckDB parity |
+| `snowflake/deploy.sql` | Snowflake database, tables, stage, contract-price masking policy, and parity checks |
+| `.cortex/skills/throughline-governed-analytics/` | Cortex Code CLI project skill: deploy and answer only through certified metrics |
+| `docs/coco-demo-script.md` | Four-minute Cortex Code CLI demo script |
 
 The prototype that GitHub Pages serves is `web/index.html`. It is generated; do not edit it by hand. Change `web/index.src.html` or `web/engine.js`, then run `python web/build.py`.
 
@@ -92,6 +95,16 @@ Without `ANTHROPIC_API_KEY`, routing is deterministic. With a key, `llm_router.p
 `tests/test_parity.py` runs the browser engine in Node and the service on DuckDB over twelve questions and fails if fingerprint, total, or any group value disagrees.
 
 ## Run it end to end
+
+One model, three surfaces. The local app needs only Python. Snowflake and Cortex Code CLI are the warehouse path and need an account.
+
+| Surface | Start | What you open |
+|---|---|---|
+| Web prototype and REST API | `./scripts/run.sh` | http://localhost:8000 and http://localhost:8000/docs |
+| MCP server | `make mcp` | Cursor or Claude, tools `ask`, `query_metric`, `list_metrics`, `describe_ontology` |
+| Snowflake | `python scripts/export_csv.py`, then `snowflake/deploy.sql` | Database `THROUGHLINE`, schema `SUPPLY_CHAIN` |
+
+Steps 1–10 below are the local app, which is what the tests and the GitHub Pages prototype cover. The warehouse steps are [Run it on Snowflake](#run-it-on-snowflake). Both paths use the same seed: 760 order lines, Q3 on-time delivery 85.84%, Chennai lowest at 81.63%.
 
 ### Prerequisites
 
@@ -382,6 +395,158 @@ The image is Python 3.12. The container listens on `0.0.0.0:8000` and serves the
 
 In the terminal where Uvicorn is running, press Ctrl+C. Do not use Ctrl+Z. A suspended job keeps port 8000 busy, and the next `./scripts/run.sh` will pass the tests and then exit with `Address already in use`.
 
+## Run it on Snowflake
+
+This loads the same seeded dataset into Snowflake, builds the semantic views, and answers through Cortex Code CLI. The project skill is `.cortex/skills/throughline-governed-analytics/SKILL.md`. The recording script is [docs/coco-demo-script.md](docs/coco-demo-script.md).
+
+### Prerequisites
+
+- A Snowflake account, and a connection in `~/.snowflake/connections.toml`. The demo uses the name `hack`.
+- Cortex Code CLI. On macOS or Linux:
+
+```bash
+curl -LsS https://ai.snowflake.com/static/cc-scripts/install.sh | sh
+cortex --version
+```
+
+The `cortex` binary lands in `~/.local/bin`. The first `cortex` opens a setup wizard and writes the connection. Start later sessions with `cortex -c hack` from the repo root.
+
+- The Python virtual environment from `./scripts/run.sh`, so `scripts/export_csv.py` can import the data generator.
+
+### 1. Export the CSVs
+
+From the repo root:
+
+```bash
+source .venv/bin/activate
+python scripts/export_csv.py
+```
+
+That writes seven files under `snowflake/data/`. The directory is gitignored. A local check of those files returns 760 order lines, freight `31113.67`, and Q3 on-time delivery `85.84`.
+
+### 2. Create the database, then load the stage
+
+`snowflake/deploy.sql` creates `THROUGHLINE.SUPPLY_CHAIN`, the dimension and fact tables, the `csv_hdr` file format, and stage `@sc_stage`. The `COPY` statements read `@sc_stage/<table>.csv.gz`, so the files have to be on the stage before those statements run. The `PUT` in the file is a comment for that reason.
+
+In Cortex Code, from the repo root:
+
+```text
+cortex -c hack
+```
+
+```text
+Deploy Throughline to Snowflake. Run python scripts/export_csv.py if snowflake/data is empty. Create the database, schema, tables, file format, and stage from snowflake/deploy.sql, PUT file://snowflake/data/*.csv to @sc_stage with AUTO_COMPRESS=TRUE, then run the COPY statements, the masking policy, and the parity checks.
+```
+
+By hand, with Snowflake CLI (`snow`) or SnowSQL, connected as a role that can create a database:
+
+```sql
+-- statements through CREATE OR REPLACE STAGE sc_stage in snowflake/deploy.sql
+PUT file://snowflake/data/*.csv @THROUGHLINE.SUPPLY_CHAIN.sc_stage AUTO_COMPRESS=TRUE;
+-- then the COPY statements, masking policy, and parity checks in snowflake/deploy.sql
+```
+
+Run the `PUT` from the repo root so `file://snowflake/data/` resolves. The parity queries at the bottom of `snowflake/deploy.sql` must return:
+
+| Check | Value |
+|---|---|
+| `order_lines` | 760 |
+| `freight` | 31113.67 |
+| `otd_q3` | 85.84 |
+
+`mask_contract_price` is applied to `v_part_contract_price.contract_price`. `SC_PROCUREMENT` sees the price. `SC_PLANNING` and `SC_LOGISTICS` see NULL. The roles are created by the deploy script. Grant them usage before switching into one:
+
+```sql
+GRANT USAGE ON DATABASE THROUGHLINE TO ROLE SC_LOGISTICS;
+GRANT USAGE ON SCHEMA THROUGHLINE.SUPPLY_CHAIN TO ROLE SC_LOGISTICS;
+GRANT SELECT ON VIEW THROUGHLINE.SUPPLY_CHAIN.v_part_contract_price TO ROLE SC_LOGISTICS;
+-- repeat for SC_PROCUREMENT, and GRANT SELECT ON ALL TABLES IN SCHEMA so that role can read the facts
+```
+
+### 3. Create the semantic views
+
+`semantic/semantic_views.sql` has two parts.
+
+- **Part 1** is Snowflake `CREATE SEMANTIC VIEW` for `sc_fulfilment` and `sc_inventory`.
+- **Part 2** is the DuckDB reference the local app uses (`INTERVAL 90 DAY`, and a plain `VIEW` also named `sc_fulfilment`). Run Part 2 only against DuckDB. On Snowflake it would replace the semantic view.
+
+`sc_inventory` reads `v_cogs_90d`, and Part 2's definition of that view is DuckDB syntax. On Snowflake, create the view with Snowflake dates, then create `sc_inventory`:
+
+```sql
+USE SCHEMA THROUGHLINE.SUPPLY_CHAIN;
+
+-- Part 1, sc_fulfilment only (the first CREATE OR REPLACE SEMANTIC VIEW in semantic/semantic_views.sql)
+
+CREATE OR REPLACE VIEW v_cogs_90d AS
+SELECT o.plant_id, o.part_id, SUM(s.qty_shipped * pt.unit_cost) AS cogs_90d
+FROM fct_shipment s
+JOIN fct_order_line o ON o.order_id = s.order_id
+JOIN dim_part pt ON pt.part_id = o.part_id
+WHERE s.ship_date > DATEADD(day, -90, DATE '2026-09-30')
+  AND s.ship_date <= DATE '2026-09-30'
+GROUP BY 1, 2;
+
+-- Part 1, sc_inventory (the second CREATE OR REPLACE SEMANTIC VIEW)
+```
+
+In Cortex Code, after the load:
+
+```text
+Create and validate semantic view sc_fulfilment from Part 1 of semantic/semantic_views.sql. Then create v_cogs_90d with DATEADD, then create semantic view sc_inventory. Do not run Part 2 on Snowflake.
+```
+
+If the semantic-view syntax differs on the account, the bundled `semantic-view` skill should correct Part 1. Commit that fix so the next run matches the file.
+
+### 4. Ask through the certified metrics
+
+Stay in `cortex -c hack`. The project skill maps team language onto `semantic/metrics.yaml` and refuses anything else.
+
+```text
+/skill list
+```
+
+You should see `throughline-governed-analytics` (this repo), plus the bundled `semantic-view` and `cortex-agent` skills.
+
+```text
+What was our service level by plant last quarter?
+```
+
+Expected: "service level" resolves to on-time delivery v2.1, path Plant → Shipment → Order, SQL against `sc_fulfilment`, overall **85.8%**, Chennai lowest at **81.6%**.
+
+```text
+Show supplier punctuality per plant for Q3 2026.
+```
+
+Same plan and the same numbers. Then the guards:
+
+```text
+What is OTIF by plant?
+```
+
+Refused. OTIF is not certified. The reply offers on-time delivery and fill rate.
+
+```text
+Days of inventory by customer
+```
+
+Blocked. Days of inventory has no ontology path to Customer (POL-02).
+
+Optional, as `SC_LOGISTICS`:
+
+```sql
+SELECT * FROM THROUGHLINE.SUPPLY_CHAIN.v_part_contract_price;
+```
+
+`contract_price` is NULL. The same query as `SC_PROCUREMENT` returns the unit cost.
+
+To leave a Cortex Agent on the semantic view:
+
+```text
+Create a Cortex Agent over sc_fulfilment for supply chain questions.
+```
+
+Ask it one certified question and confirm it returns the same 85.8%.
+
 ## Publish the repo and the prototype
 
 The prototype committed in this repo is `web/index.html`, built from `web/index.src.html` and `web/engine.js`. Pushing `main` runs `.github/workflows/pages.yml`, which rebuilds that file and deploys it to GitHub Pages. `.github/workflows/ci.yml` runs the tests and fails the build if `web/index.html` was not regenerated.
@@ -410,11 +575,11 @@ In the repo settings, set Pages to **GitHub Actions**. If the GitHub repo name i
 
 **Technical execution.** One semantic model, two engines: the browser and the Python/DuckDB service share the seeded data generator, metric definitions and fingerprint function, and a CI test fails if they ever disagree. Plans are validated against the ontology before any SQL exists; the LLM path is schema-constrained and can't emit SQL.
 
-**Solution completeness.** Ontology → semantic views → certified metrics → NL layer → governance (refusal, clarification, ontology guards, masking, small-sample flags, audit, lineage) → three delivery channels (web, REST, MCP) → tests and CI/CD to GitHub Pages.
+**Solution completeness.** Ontology → semantic views → certified metrics → NL layer → governance (refusal, clarification, ontology guards, masking, small-sample flags, audit, lineage) → four delivery channels (web, REST, MCP, Cortex Code CLI on Snowflake) → tests and CI/CD to GitHub Pages.
 
 ## Production path
 
-Swap DuckDB for Snowflake (`semantic/semantic_views.sql` is ready) or Databricks; load the ontology into a catalog (Unity Catalog / Horizon / Collibra) so metric ownership and lineage are discoverable; replace synthetic data with CDC feeds from ERP/TMS/WMS; route ambiguous or high-stakes questions to a human steward; add metric-change review in pull requests (a definition change bumps the version and changes every fingerprint that depends on it).
+The Snowflake load, semantic views, masking policy, and Cortex Code CLI skill are in [Run it on Snowflake](#run-it-on-snowflake). From there: load the ontology into a catalog (Unity Catalog / Horizon / Collibra) so metric ownership and lineage are discoverable; replace synthetic data with CDC feeds from ERP/TMS/WMS; route ambiguous or high-stakes questions to a human steward; add metric-change review in pull requests (a definition change bumps the version and changes every fingerprint that depends on it).
 
 ---
 Built by Baskarraj S N · +91-9703801932 · snbaskar@gmail.com · [Portfolio](https://snbaskarraj.github.io/snbaskarraj.io/) · [GitHub](https://github.com/snbaskarraj)
