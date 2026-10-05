@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.duckdb
+_site/
+
+.env
+.cursor/mcp.json
+.DS_Store

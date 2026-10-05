@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "throughline": {
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["-m", "throughline.mcp_server"],
+      "env": { "PYTHONPATH": "${workspaceFolder}/src" }
+    }
+  }
+}

@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Throughline — supply chain ontology and governed conversational analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EDF0EF;--card:#FFFFFF;--ink:#17252A;--muted:#56676D;--rule:#CBD3D2;--soft:#E2E8E7;
+  --band:#17252A;--bandText:#DCE5E4;--bandMuted:#7C9095;--amber:#E9A21A;--amberInk:#17252A;
+  --steel:#2E5E7E;--flag:#B4432F;--ok:#2B7552;
+  --sans:"Barlow",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --cond:"Barlow Condensed","Arial Narrow","Roboto Condensed",system-ui,sans-serif;
+  --code:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#10171A;--card:#182226;--ink:#E2EAEA;--muted:#92A3A8;--rule:#2A383D;--soft:#1F2B30;
+  --band:#0A1012;--bandText:#DCE5E4;--bandMuted:#6B7F84;--amber:#F0B02E;--amberInk:#10171A;
+  --steel:#86B5D4;--flag:#E3826B;--ok:#62BE90;}}
+:root[data-theme="dark"]{
+  --paper:#10171A;--card:#182226;--ink:#E2EAEA;--muted:#92A3A8;--rule:#2A383D;--soft:#1F2B30;
+  --band:#0A1012;--bandText:#DCE5E4;--bandMuted:#6B7F84;--amber:#F0B02E;--amberInk:#10171A;
+  --steel:#86B5D4;--flag:#E3826B;--ok:#62BE90;}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 16px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+h1,h2,h3{font-family:var(--cond);font-weight:600;letter-spacing:.005em;line-height:1.15;margin:0}
+code,pre{font-family:var(--code);font-size:13px}
+.muted{color:var(--muted)}
+
+/* header */
+header.top{padding:18px 0 14px}
+header .wrap{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.brand{display:flex;gap:12px;align-items:center}
+.brand h1{font-size:30px;font-weight:700}
+.brand p{margin:0;color:var(--muted);font-size:15px}
+.persona{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.persona span{font-size:14px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:999px;background:var(--card);padding:3px}
+.seg button{border:0;background:none;padding:6px 14px;border-radius:999px;cursor:pointer;font-weight:500;font-size:15px}
+.seg button[aria-checked="true"]{background:var(--ink);color:var(--paper)}
+
+/* the route — the one bold element */
+.route{background:var(--band);color:var(--bandText)}
+.route .wrap{padding-top:18px;padding-bottom:16px}
+.lane{display:flex;align-items:center;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.node{flex:none;font-family:var(--cond);font-weight:600;font-size:19px;padding:7px 16px;border:1.5px solid var(--bandMuted);border-radius:4px;color:var(--bandText);background:transparent;transition:background .35s,color .35s,border-color .35s}
+.edge{flex:1 0 64px;min-width:64px;position:relative;height:30px;display:flex;align-items:center;justify-content:center}
+.edge::before{content:"";position:absolute;left:4px;right:4px;top:50%;border-top:2px dashed var(--bandMuted);transition:border-color .35s}
+.edge i{position:relative;font-style:normal;font-size:12.5px;color:var(--bandMuted);background:var(--band);padding:0 6px;transform:translateY(-12px);white-space:nowrap}
+.node.on{background:var(--amber);border-color:var(--amber);color:var(--amberInk)}
+.edge.on::before{border-top:2px solid var(--amber)}
+.edge.on i{color:var(--amber)}
+.route .caption{margin:10px 0 0;font-size:14.5px;color:var(--bandMuted);min-height:22px}
+.route .caption b{color:var(--bandText);font-weight:500}
+@media (prefers-reduced-motion:reduce){.node,.edge::before{transition:none}}
+
+/* tabs */
+nav.tabs{border-bottom:1px solid var(--rule);background:var(--paper);position:sticky;top:0;z-index:5}
+nav.tabs .wrap{display:flex;gap:4px;overflow-x:auto}
+nav.tabs button{border:0;background:none;padding:13px 12px 11px;cursor:pointer;font-weight:500;font-size:15.5px;color:var(--muted);border-bottom:3px solid transparent;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--amber)}
+main{padding:26px 0 60px}
+section.panel[hidden]{display:none}
+.lede{max-width:70ch;color:var(--muted);margin:6px 0 20px}
+h2{font-size:26px}
+
+/* ask */
+.ask-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:28px}
+@media (max-width:900px){.ask-grid{grid-template-columns:1fr}}
+.askbar{display:flex;gap:8px;background:var(--card);border:1px solid var(--rule);border-radius:8px;padding:6px}
+.askbar input{flex:1;min-width:0;border:0;background:transparent;padding:10px 10px;font-size:17px}
+.askbar input:focus{outline:none}
+.askbar:focus-within{border-color:var(--steel)}
+.btn{border:0;border-radius:6px;padding:10px 18px;background:var(--ink);color:var(--paper);font-weight:600;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--rule)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 22px}
+.chip{border:1px solid var(--rule);background:transparent;border-radius:999px;padding:5px 12px;font-size:14.5px;cursor:pointer;text-align:left}
+.chip:hover{border-color:var(--steel);color:var(--steel)}
+.thread{display:flex;flex-direction:column;gap:18px}
+.answer{background:var(--card);border:1px solid var(--rule);border-radius:8px;padding:18px 20px}
+.answer .q{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;color:var(--muted);font-size:15px;margin-bottom:8px}
+.tag{font-size:12.5px;font-weight:600;border-radius:3px;padding:1px 7px;background:var(--soft);color:var(--ink)}
+.answer .headline{font-size:19px;line-height:1.4;margin:0 0 6px;max-width:68ch}
+.answer .big{font-family:var(--cond);font-size:44px;font-weight:600;line-height:1;margin:6px 0 2px}
+.answer .note{font-size:14.5px;color:var(--muted);margin:4px 0 0}
+.answer.refused{border-left:4px solid var(--flag)}
+.answer.clarify{border-left:4px solid var(--amber)}
+.bars{margin:14px 0 4px;display:grid;grid-template-columns:minmax(110px,max-content) 1fr max-content;gap:6px 12px;align-items:center;font-size:15px}
+.bars .lab{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.bars .track{height:12px;background:var(--soft);border-radius:2px;overflow:hidden}
+.bars .fill{height:100%;background:var(--steel)}
+.bars .fill.top{background:var(--amber)}
+.bars .val{font-variant-numeric:tabular-nums;font-weight:500;text-align:right}
+.bars .low{font-size:12px;color:var(--flag);margin-left:6px;font-weight:400}
+details.how{margin-top:14px;border-top:1px solid var(--rule);padding-top:10px}
+details.how summary{cursor:pointer;font-weight:600;font-size:15px;color:var(--steel)}
+.kv{display:grid;grid-template-columns:150px 1fr;gap:6px 14px;margin:12px 0;font-size:14.5px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0}
+.pill{display:inline-block;border:1px solid var(--rule);border-radius:4px;padding:0 6px;margin:0 4px 4px 0;font-size:13.5px}
+.pill.pass{border-color:var(--ok);color:var(--ok)}
+.pill.info{border-color:var(--steel);color:var(--steel)}
+pre.sql{background:var(--soft);border-radius:6px;padding:12px 14px;overflow-x:auto;margin:8px 0 0;line-height:1.45}
+.records{margin-top:10px}
+.tbl-wrap{overflow-x:auto;margin-top:8px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-weight:600;color:var(--muted);font-size:13.5px}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.masked{color:var(--muted);letter-spacing:.1em}
+aside.side h3{font-size:19px;margin:0 0 6px}
+aside.side .box{border-top:1px solid var(--rule);padding:14px 0}
+.glossary{list-style:none;margin:0;padding:0;font-size:14.5px}
+.glossary li{display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px dotted var(--rule)}
+.glossary li b{font-weight:500}
+.glossary li span{color:var(--muted);text-align:right}
+.empty{border:1px dashed var(--rule);border-radius:8px;padding:22px;color:var(--muted)}
+
+/* proof */
+.presets{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.presets button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.proof-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:900px){.proof-grid{grid-template-columns:1fr}}
+.pcol{background:var(--card);border:1px solid var(--rule);border-radius:8px;padding:16px}
+.pcol h3{font-size:20px}
+.pcol .said{font-style:italic;margin:6px 0 10px;min-height:48px}
+.pcol .fp{font-family:var(--code);font-size:13px;margin-top:10px;color:var(--muted)}
+.pcol table{font-size:13.5px}
+.verdict{margin:16px 0 26px;padding:14px 18px;border-radius:8px;border:1.5px solid var(--ok);color:var(--ok);font-weight:600;font-size:17px;background:var(--card)}
+.verdict.fail{border-color:var(--flag);color:var(--flag)}
+.raw{background:var(--card);border:1px solid var(--rule);border-radius:8px;padding:16px 18px}
+.raw .row{display:grid;grid-template-columns:160px 1fr 110px;gap:12px;padding:8px 0;border-bottom:1px solid var(--rule);align-items:baseline}
+.raw .row:last-child{border-bottom:0}
+.raw .row .v{font-family:var(--cond);font-size:22px;font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+.raw .row.canon .v{color:var(--ok)}
+.raw .row .delta{font-size:13px;color:var(--flag);display:block;font-family:var(--sans);font-weight:500}
+@media (max-width:640px){.raw .row{grid-template-columns:1fr 90px}.raw .row .def{grid-column:1/-1;order:3}}
+
+/* ontology */
+.onto-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px}
+@media (max-width:980px){.onto-grid{grid-template-columns:1fr}}
+.svg-wrap{background:var(--card);border:1px solid var(--rule);border-radius:8px;overflow-x:auto;padding:8px}
+.svg-wrap svg{display:block;min-width:720px;width:100%;height:auto}
+svg .ent rect{fill:var(--card);stroke:var(--ink);stroke-width:1.5}
+svg .ent text{fill:var(--ink);font-family:var(--cond);font-size:17px;font-weight:600}
+svg .ent{cursor:pointer}
+svg .ent.sel rect{fill:var(--amber);stroke:var(--amber)}
+svg .ent.sel text{fill:var(--amberInk)}
+svg .hier rect{fill:var(--soft);stroke:var(--rule)}
+svg .hier text{fill:var(--muted);font-family:var(--sans);font-size:13px}
+svg .rel{stroke:var(--ink);stroke-width:1.5;fill:none}
+svg .hrel{stroke:var(--rule);stroke-width:1.5;fill:none;stroke-dasharray:4 3}
+svg .rlab{fill:var(--muted);font-family:var(--sans);font-size:12.5px}
+.detail{background:var(--card);border:1px solid var(--rule);border-radius:8px;padding:16px 18px}
+.detail h3{font-size:22px}
+.detail h4{margin:14px 0 4px;font-size:14px;color:var(--muted);font-weight:600}
+.detail ul{margin:0;padding-left:18px;font-size:14.5px}
+
+/* metrics / governance */
+.mtable td:first-child{font-weight:600;white-space:nowrap}
+.status{color:var(--ok);font-weight:600;white-space:nowrap}
+.gov-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px}
+@media (max-width:900px){.gov-grid{grid-template-columns:1fr}}
+.policy{border-top:1px solid var(--rule);padding:12px 0}
+.policy h3{font-size:18px}
+.policy p{margin:4px 0 0;font-size:14.5px;color:var(--muted)}
+.lineage{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px;font-size:14px}
+.lineage span{border:1px solid var(--rule);border-radius:4px;padding:3px 8px;background:var(--card)}
+.lineage em{font-style:normal;color:var(--muted)}
+.why-table td:nth-child(3),.why-table th:nth-child(3){text-align:right}
+.foot{border-top:1px solid var(--rule);padding:18px 0 30px;color:var(--muted);font-size:14px}
+select{border:1px solid var(--rule);border-radius:6px;padding:7px 10px;background:var(--card)}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true"><rect x="1" y="14" width="10" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="27" y="14" width="10" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 19h16" stroke="var(--amber)" stroke-width="3"/></svg>
+      <div><h1>Throughline</h1><p>Supply chain ontology and governed conversational analytics</p></div>
+    </div>
+    <div class="persona"><span id="persona-label">Asking as</span>
+      <div class="seg" role="radiogroup" aria-labelledby="persona-label" id="persona"></div>
+    </div>
+  </div>
+</header>
+
+<div class="route" aria-live="polite">
+  <div class="wrap">
+    <div class="lane" id="lane"></div>
+    <p class="caption" id="caption">Ask a question and the path it takes through the ontology lights up here.</p>
+  </div>
+</div>
+
+<nav class="tabs"><div class="wrap" role="tablist" id="tabs"></div></nav>
+
+<main><div class="wrap">
+  <section class="panel" id="p-ask" role="tabpanel">
+    <div class="ask-grid">
+      <div>
+        <form class="askbar" id="askform" autocomplete="off">
+          <label for="q" class="visually-hidden" style="position:absolute;left:-9999px">Question</label>
+          <input id="q" placeholder="Ask about suppliers, parts, plants, shipments, orders or customers">
+          <button class="btn" type="submit">Ask</button>
+        </form>
+        <div class="chips" id="chips"></div>
+        <div class="thread" id="thread"><div class="empty">Every answer is computed from certified metric definitions over one ontology, so planning, procurement and logistics get the same number for the same question, however they phrase it. Try a suggestion above.</div></div>
+      </div>
+      <aside class="side">
+        <div class="box"><h3>Words your team uses</h3><p class="muted" style="font-size:14px;margin:0 0 8px">Each resolves to one certified metric.</p><ul class="glossary" id="glossary"></ul></div>
+        <div class="box"><h3>Data in this prototype</h3><p class="muted" style="font-size:14.5px;margin:0" id="datanote"></p></div>
+      </aside>
+    </div>
+  </section>
+
+  <section class="panel" id="p-proof" role="tabpanel" hidden>
+    <h2>Same metric, every team</h2>
+    <p class="lede">Each team asks in its own words. The semantic layer resolves all three to one plan, proven by an identical fingerprint and identical results. Below, the raw source systems show why this used to be impossible.</p>
+    <div class="presets" id="presets"></div>
+    <div class="proof-grid" id="proofgrid"></div>
+    <div class="verdict" id="verdict"></div>
+    <h3 style="font-size:20px;margin-bottom:8px" id="rawtitle"></h3>
+    <div class="raw" id="raw"></div>
+  </section>
+
+  <section class="panel" id="p-onto" role="tabpanel" hidden>
+    <h2>The supply chain ontology</h2>
+    <p class="lede">Six business entities, five relationships and their hierarchies. Every source system's keys are mapped to these entities, and every metric is defined against them. Select an entity to see its attributes and source mappings.</p>
+    <div class="onto-grid">
+      <div class="svg-wrap" id="svgwrap"></div>
+      <div class="detail" id="entdetail"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="p-metrics" role="tabpanel" hidden>
+    <h2>Metric catalog</h2>
+    <p class="lede">Canonical metrics, each with one definition, an accountable owner, a version and the dimensions the ontology allows. The conversational layer can only answer with these.</p>
+    <div class="tbl-wrap"><table class="mtable" id="mtable"></table></div>
+  </section>
+
+  <section class="panel" id="p-gov" role="tabpanel" hidden>
+    <h2>Governance</h2>
+    <p class="lede">Policies the answer engine enforces, the audit trail of every question asked in this session, and lineage from source systems to each metric.</p>
+    <div class="gov-grid">
+      <div><h3 style="font-size:20px;margin-bottom:6px">Policies</h3><div id="policies"></div></div>
+      <div>
+        <h3 style="font-size:20px">Lineage</h3>
+        <p style="margin:6px 0"><label for="linsel" class="muted" style="font-size:14px">Metric </label><select id="linsel"></select></p>
+        <div class="lineage" id="lineage"></div>
+        <h3 style="font-size:20px;margin-top:26px">Audit log</h3>
+        <div class="tbl-wrap"><table id="audit"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="p-why" role="tabpanel" hidden>
+    <h2>Why this exists</h2>
+    <p class="lede">Ask “what was on-time delivery last quarter?” of each source system and you get a different answer, because each computes it differently. The same supplier also carries a different key in every system. The ontology and certified metrics remove both problems.</p>
+    <div class="tbl-wrap"><table class="why-table" id="whytable"></table></div>
+    <h3 style="font-size:20px;margin:28px 0 6px">One supplier, four identities</h3>
+    <p class="muted" style="margin:0 0 6px;font-size:15px">The ontology's crosswalk resolves each source key to a single Supplier entity.</p>
+    <div class="tbl-wrap"><table id="xwalk"></table></div>
+  </section>
+</div></main>
+<footer class="foot"><div class="wrap" id="foot"></div></footer>
+
+<script>
+/*ENGINE*/
+</script>
+<script>
+(() => {
+const E = Engine;
+const $ = s => document.querySelector(s);
+const el = (tag, attrs = {}, html = '') => { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); if (html) n.innerHTML = html; return n; };
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const keyLabel = k => /^\d{4}-\d{2}$/.test(k) ? MON[+k.slice(5)-1] + ' ' + k.slice(0,4) : /^\d{4}-Q\d$/.test(k) ? k.slice(5) + ' ' + k.slice(0,4) : k;
+const escH = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const PERSONAS = {
+  planning: { label: 'Planning', ask: ['What was our service level by plant last quarter?', 'Fill rate by part category year to date', 'Days of inventory by plant', 'Monthly fill rate trend', 'Which customer had the worst service level in Q3?', 'What is OTIF by plant?'] },
+  procurement: { label: 'Procurement', ask: ['Supplier punctuality by supplier in Q3 2026', 'Landed cost per unit by supplier', 'Worst 3 suppliers on fill rate this year', 'Landed cost for electronics by month', 'Days of inventory by customer', 'What is our revenue by supplier?'] },
+  logistics: { label: 'Logistics', ask: ['Delivery performance by carrier last quarter', 'Freight cost by transport mode', 'Late shipments by carrier in Q3', 'Temperature excursions on ocean shipments', 'Average lead time by mode', "What's the cost by carrier?"] }
+};
+let persona = 'planning';
+const audit = [];
+
+// ---------- persona switch ----------
+const seg = $('#persona');
+for (const [id, p] of Object.entries(PERSONAS)) {
+  const b = el('button', { role: 'radio', 'aria-checked': id === persona, 'data-id': id }, p.label);
+  b.addEventListener('click', () => setPersona(id));
+  seg.appendChild(b);
+}
+seg.addEventListener('keydown', e => {
+  if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+  const ids = Object.keys(PERSONAS); let i = ids.indexOf(persona) + (e.key === 'ArrowRight' ? 1 : -1);
+  i = (i + ids.length) % ids.length; setPersona(ids[i]); seg.querySelector(`[data-id="${ids[i]}"]`).focus();
+});
+function setPersona(id) {
+  persona = id;
+  seg.querySelectorAll('button').forEach(b => { b.setAttribute('aria-checked', b.dataset.id === id); b.tabIndex = b.dataset.id === id ? 0 : -1; });
+  renderChips(); renderGlossary();
+}
+
+// ---------- route lane ----------
+const lane = $('#lane');
+E.CHAIN.forEach((ent, i) => {
+  lane.appendChild(el('div', { class: 'node', 'data-ent': ent }, ent));
+  if (i < E.CHAIN.length - 1) { const r = E.RELS[i]; lane.appendChild(el('div', { class: 'edge', 'data-i': i }, `<i>${r.label}</i>`)); }
+});
+function lightPath(ents, text) {
+  const idx = ents.map(e => E.CHAIN.indexOf(e));
+  lane.querySelectorAll('.node').forEach(n => n.classList.toggle('on', ents.includes(n.dataset.ent)));
+  lane.querySelectorAll('.edge').forEach(n => { const i = +n.dataset.i; n.classList.toggle('on', idx.includes(i) && idx.includes(i + 1)); });
+  $('#caption').innerHTML = text;
+}
+
+// ---------- tabs ----------
+const TABS = [['ask', 'Ask'], ['proof', 'Same answer, every team'], ['onto', 'Ontology'], ['metrics', 'Metric catalog'], ['gov', 'Governance'], ['why', 'Why this exists']];
+const tabs = $('#tabs');
+TABS.forEach(([id, label], i) => {
+  const b = el('button', { role: 'tab', id: 't-' + id, 'aria-controls': 'p-' + id, 'aria-selected': i === 0, tabindex: i === 0 ? 0 : -1 }, label);
+  b.addEventListener('click', () => showTab(id));
+  tabs.appendChild(b);
+});
+tabs.addEventListener('keydown', e => {
+  if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+  const ids = TABS.map(t => t[0]); const cur = ids.indexOf(document.activeElement.id.slice(2));
+  const nx = ids[(cur + (e.key === 'ArrowRight' ? 1 : -1) + ids.length) % ids.length]; showTab(nx); $('#t-' + nx).focus();
+});
+function showTab(id) {
+  TABS.forEach(([t]) => { const on = t === id; $('#t-' + t).setAttribute('aria-selected', on); $('#t-' + t).tabIndex = on ? 0 : -1; $('#p-' + t).hidden = !on; });
+  if (id === 'gov') renderAudit();
+}
+
+// ---------- ask ----------
+function renderChips() {
+  const c = $('#chips'); c.innerHTML = '';
+  PERSONAS[persona].ask.forEach(q => { const b = el('button', { class: 'chip', type: 'button' }, escH(q)); b.addEventListener('click', () => ask(q)); c.appendChild(b); });
+}
+function renderGlossary() {
+  const g = $('#glossary'); g.innerHTML = '';
+  const items = [];
+  for (const id of E.PRIORITY) for (const [w, who] of E.METRICS[id].synonyms) if (who === persona) items.push([w, E.METRICS[id].label]);
+  for (const id of ['otd', 'fill_rate', 'landed_cost', 'doi']) items.push([E.METRICS[id].synonyms[0][0], E.METRICS[id].label]);
+  const seen = new Set();
+  items.filter(([w]) => !seen.has(w) && seen.add(w)).forEach(([w, m]) => g.appendChild(el('li', {}, `<b>“${escH(w)}”</b><span>${escH(m)}</span>`)));
+}
+$('#askform').addEventListener('submit', e => { e.preventDefault(); const q = $('#q').value.trim(); if (q) ask(q); });
+
+function scopeText(plan) {
+  if (!plan.filters.length) return '';
+  return ' for ' + plan.filters.map(f => f.dim === 'plant' ? f.value + ' plant' : f.dim === 'mode' ? f.value.toLowerCase() + ' shipments' : f.dim === 'category' ? f.value.toLowerCase() + ' parts' : f.dim === 'segment' ? f.value + ' customers' : f.dim === 'region' ? f.value : f.value).join(', ');
+}
+function headline(plan, res) {
+  const M = E.METRICS[plan.metric], f = v => E.fmt(plan.metric, v), when = plan.period.label;
+  const t = res.total;
+  if (!plan.dimension) {
+    if (t.value === null) return `No data for ${M.label.toLowerCase()}${scopeText(plan)} in ${when}. Data runs from 1 Jan to 30 Sep 2026.`;
+    return `${M.label}${scopeText(plan)} was <b>${f(t.value)}</b> in ${when}, based on ${t.n.toLocaleString('en-US')} ${t.nLabel}.`;
+  }
+  const g = res.groups.filter(x => x.value !== null);
+  if (!g.length) return `No data for ${M.label.toLowerCase()}${scopeText(plan)} in ${when}.`;
+  const dl = E.DIMS[plan.dimension].label.toLowerCase();
+  if (plan.dimension === 'month' || plan.dimension === 'quarter') {
+    const a = g[0], b = g[g.length - 1];
+    return `${M.label}${scopeText(plan)} moved from <b>${f(a.value)}</b> in ${keyLabel(a.key)} to <b>${f(b.value)}</b> in ${keyLabel(b.key)}. Overall: ${f(t.value)}.`;
+  }
+  if (g.length === 1) return `${g[0].key} — ${M.label.toLowerCase()} of <b>${f(g[0].value)}</b> in ${when}${plan.limit === 1 ? ', the ' + (plan.sort === 'worst' ? 'weakest' : 'strongest') + ' ' + dl : ''}. Overall: ${f(t.value)}.`;
+  const sorted = [...g].sort((x, y) => y.value - x.value), hi = sorted[0], lo = sorted[sorted.length - 1];
+  if (M.better === 'higher') return `By ${dl}, ${hi.key} leads at <b>${f(hi.value)}</b> and ${lo.key} trails at <b>${f(lo.value)}</b> (${when}). Overall: ${f(t.value)}.`;
+  if (M.better === 'lower' && !M.total) return `By ${dl}, ${lo.key} is lowest at <b>${f(lo.value)}</b> and ${hi.key} highest at <b>${f(hi.value)}</b> (${when}). Overall: ${f(t.value)}.`;
+  return `By ${dl}, ${hi.key} is highest at <b>${f(hi.value)}</b> and ${lo.key} lowest at <b>${f(lo.value)}</b> (${when}). ${M.total ? 'Total' : 'Overall'}: ${f(t.value)}.`;
+}
+function barsHTML(plan, res) {
+  const g = res.groups; if (!g.length) return '';
+  const vals = g.filter(x => x.value !== null).map(x => x.value);
+  const max = Math.max(...vals), min = Math.min(...vals);
+  const pctMetric = E.METRICS[plan.metric].unit === '%';
+  const lo = pctMetric ? Math.max(0, Math.floor((min - 10) / 10) * 10) : 0; // zoom percentages so differences are visible
+  const span = (max - lo) || 1;
+  const best = plan.dimension === 'month' || plan.dimension === 'quarter' ? null : g[0];
+  return `<div class="bars" role="table" aria-label="Results by ${escH(E.DIMS[plan.dimension].label)}">` + g.map(x => {
+    const w = x.value === null ? 0 : Math.max(2, (x.value - lo) / span * 100);
+    return `<div class="lab" role="cell" title="${escH(keyLabel(x.key))}">${escH(keyLabel(x.key))}</div><div class="track" role="cell"><div class="fill${x === best ? ' top' : ''}" style="width:${w}%"></div></div><div class="val" role="cell">${E.fmt(plan.metric, x.value)}${x.lowConfidence ? '<span class="low">low sample</span>' : ''}</div>`;
+  }).join('') + '</div>' + (pctMetric && lo > 0 ? `<p class="note">Bar axis starts at ${lo}% to make differences visible.</p>` : '');
+}
+function recordsHTML(plan, res) {
+  const canSee = persona === 'procurement';
+  const price = v => canSee ? '$' + v.toFixed(2) : '<span class="masked" title="Masked by POL-03">•••••</span>';
+  if (plan.metric === 'doi') {
+    const rows = res.rows.slice(0, 8);
+    return `<div class="tbl-wrap"><table><thead><tr><th>Plant</th><th>Part</th><th>Supplier</th><th class="num">On hand</th><th class="num">Unit price</th></tr></thead><tbody>` +
+      rows.map(r => `<tr><td>${r.plant.name}</td><td>${escH(r.part.name)}</td><td>${escH(r.supplier.name)}</td><td class="num">${r.on_hand.toLocaleString('en-US')}</td><td class="num">${price(r.part.cost)}</td></tr>`).join('') + `</tbody></table></div>`;
+  }
+  const rows = res.rows.slice(0, 8);
+  return `<div class="tbl-wrap"><table><thead><tr><th>Order</th><th>Ordered</th><th>Part</th><th>Supplier</th><th>Plant</th><th>Customer</th><th>Carrier</th><th>Promised</th><th>Delivered</th><th class="num">Qty ord / shipped</th><th class="num">Unit price</th></tr></thead><tbody>` +
+    rows.map(r => `<tr><td>${r.order_id}</td><td>${E.iso(r.od)}</td><td>${escH(r.part.name)}</td><td>${escH(r.supplier.name)}</td><td>${r.plant.name}</td><td>${escH(r.customer.name)}</td><td>${escH(r.carrier.name)}</td><td>${E.iso(r.promised)}</td><td>${r.deliv ? E.iso(r.deliv) : '<span class="muted">in transit</span>'}</td><td class="num">${r.qo} / ${r.qs}</td><td class="num">${price(r.part.cost)}</td></tr>`).join('') +
+    `</tbody></table></div><p class="note">${canSee ? 'Procurement can see supplier contract prices.' : 'Supplier unit prices are masked for ' + PERSONAS[persona].label + ' by policy POL-03. Metric values are unaffected.'} Showing 8 of ${res.rows.length.toLocaleString('en-US')} records.</p>`;
+}
+
+function ask(question, opts = {}) {
+  $('#q').value = '';
+  const thread = $('#thread');
+  if (thread.querySelector('.empty')) thread.innerHTML = '';
+  const card = el('article', { class: 'answer' });
+  const P = PERSONAS[persona];
+  const qline = `<div class="q"><span class="tag">${P.label}</span><span>${escH(question)}</span></div>`;
+  const parsed = E.parse(question);
+  const logBase = { time: new Date(), persona: P.label, question };
+
+  if (parsed.status === 'refused' || parsed.status === 'unknown') {
+    card.classList.add('refused');
+    const msg = parsed.status === 'refused' ? parsed.message : 'That question doesn\'t mention a certified metric. Answers can only come from the metric catalog.';
+    card.innerHTML = qline + `<p class="headline">${escH(msg)}</p><p class="note">Certified metrics: ${E.PRIORITY.map(id => E.METRICS[id].label).join(', ')}.</p><div class="chips" style="margin:12px 0 0"></div>`;
+    ['otd', 'fill_rate'].forEach(id => { const b = el('button', { class: 'chip', type: 'button' }, 'Ask about ' + E.METRICS[id].label.toLowerCase()); b.onclick = () => ask(question.replace(/\b(otif|revenue|sales|margin|profit)\b/i, E.METRICS[id].synonyms[0][0]).replace(/^(hello|hi)\b.*/i, E.METRICS[id].label + ' by plant')); card.querySelector('.chips').appendChild(b); });
+    audit.unshift({ ...logBase, outcome: 'Refused (POL-01)', fp: '—' });
+    lightPath([], 'No path used. The question was refused by policy POL-01, certified metrics only.');
+  } else if (parsed.status === 'clarify') {
+    card.classList.add('clarify');
+    card.innerHTML = qline + `<p class="headline">${escH(parsed.prompt)}</p><div class="chips" style="margin:12px 0 0"></div>`;
+    parsed.options.forEach(([id, phrase]) => { const b = el('button', { class: 'chip', type: 'button' }, escH(E.METRICS[id].label)); b.onclick = () => ask(question.replace(new RegExp('\\b' + parsed.term + '\\b', 'i'), phrase)); card.querySelector('.chips').appendChild(b); });
+    audit.unshift({ ...logBase, outcome: 'Clarification asked', fp: '—' });
+  } else {
+    const plan = parsed.plan, M = E.METRICS[plan.metric];
+    const v = E.validate(plan);
+    if (!v.ok) {
+      card.classList.add('refused');
+      card.innerHTML = qline + `<p class="headline">${escH(v.message)}</p><p class="note">Allowed for ${escH(M.label.toLowerCase())}: ${escH(v.allowed.join(', '))}. Enforced by ${v.policy}, ontology-valid slicing.</p>`;
+      audit.unshift({ ...logBase, outcome: 'Blocked (POL-02)', fp: '—' });
+      lightPath(E.entitiesTouched({ ...plan, dimension: null, filters: [] }), `<b>${M.label}</b> connects only to ${M.entities.join(' and ')}, so the requested path doesn't exist in the ontology.`);
+    } else {
+      const res = E.execute(plan);
+      const fp = E.fingerprint(plan);
+      const path = E.entitiesTouched(plan);
+      const big = !plan.dimension && res.total.value !== null ? `<div class="big">${E.fmt(plan.metric, res.total.value)}</div>` : '';
+      const lowFlags = res.groups.filter(g => g.lowConfidence).length;
+      card.innerHTML = qline + big + `<p class="headline">${headline(plan, res)}</p>` +
+        parsed.notes.map(n => `<p class="note">${escH(n)}</p>`).join('') +
+        barsHTML(plan, res) +
+        `<details class="how"${opts.open || audit.length === 0 ? ' open' : ''}><summary>How this was answered</summary>
+          <dl class="kv">
+            <dt>Your words</dt><dd>“${escH(parsed.matched)}” → <b>${escH(M.label)}</b> v${M.version}</dd>
+            <dt>Definition</dt><dd>${escH(M.definition)}</dd>
+            <dt>Owner</dt><dd>${escH(M.owner)}, certified ${E.fmtDate(E.d(M.certified))}</dd>
+            <dt>Sliced by</dt><dd>${plan.dimension ? escH(E.DIMS[plan.dimension].label) : 'Not sliced'}</dd>
+            <dt>Filters</dt><dd>${plan.filters.length ? plan.filters.map(f => `<span class="pill">${escH(E.DIMS[f.dim].label)} = ${escH(f.value)}</span>`).join('') : 'None'}</dd>
+            <dt>Period</dt><dd>${escH(plan.period.label)} (${plan.period.from} to ${plan.period.to}, by ${M.timeAnchor.toLowerCase()})</dd>
+            <dt>Ontology path</dt><dd>${path.join(' → ')}</dd>
+            <dt>Semantic view</dt><dd><code>${M.view}</code></dd>
+            <dt>Policy checks</dt><dd><span class="pill pass">POL-01 certified</span><span class="pill pass">POL-02 valid path</span><span class="pill ${persona === 'procurement' ? 'pass' : 'info'}">POL-03 ${persona === 'procurement' ? 'prices visible' : 'prices masked'}</span><span class="pill ${lowFlags ? 'info' : 'pass'}">POL-04 ${lowFlags ? lowFlags + ' low-sample group' + (lowFlags > 1 ? 's' : '') : 'samples ok'}</span><span class="pill pass">POL-05 logged</span></dd>
+            <dt>Plan fingerprint</dt><dd><code>${fp}</code></dd>
+          </dl>
+          <div class="muted" style="font-size:14px">Compiled SQL</div>
+          <pre class="sql">${escH(E.compile(plan))}</pre>
+          <div class="records"><button class="btn ghost" type="button">Show records</button></div>
+        </details>`;
+      const rb = card.querySelector('.records button');
+      rb.addEventListener('click', () => { const div = el('div'); div.innerHTML = recordsHTML(plan, res); rb.replaceWith(div); });
+      audit.unshift({ ...logBase, outcome: M.label + (plan.dimension ? ' by ' + E.DIMS[plan.dimension].label.toLowerCase() : ''), fp });
+      lightPath(path, `Path used: <b>${path.join(' → ')}</b> for ${escH(M.label.toLowerCase())}${plan.dimension ? ' by ' + escH(E.DIMS[plan.dimension].label.toLowerCase()) : ''}.`);
+    }
+  }
+  thread.prepend(card);
+  card.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+}
+
+// ---------- proof ----------
+const PRESETS = [
+  { id: 'otd', label: 'On-time delivery by plant, Q3', raw: 'otd', q: { planning: 'What was our service level by plant last quarter?', procurement: 'Show supplier punctuality per plant for Q3 2026', logistics: 'Delivery performance by plant, July to September 2026' } },
+  { id: 'fill', label: 'Fill rate by supplier, Q3', raw: 'fill_rate', q: { planning: 'Unit fill by supplier last quarter', procurement: 'Fill rate per vendor in Q3 2026', logistics: 'Fulfilment rate for each supplier, Jul to Sep' } },
+  { id: 'landed', label: 'Landed cost by category, Q3', raw: 'landed_cost', q: { planning: 'Cost per unit by part category last quarter', procurement: 'Total landed cost per category for Q3', logistics: 'Landed cost by category, July to September 2026' } },
+  { id: 'doi', label: 'Days of inventory by plant', raw: 'doi', q: { planning: 'Days of supply by plant', procurement: 'Inventory days per site', logistics: 'Days on hand for each plant' } }
+];
+let preset = PRESETS[0];
+const pz = $('#presets');
+PRESETS.forEach(p => { const b = el('button', { class: 'chip', type: 'button', 'aria-pressed': p === preset }, p.label); b.onclick = () => { preset = p; pz.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); renderProof(); }; pz.appendChild(b); });
+function renderProof() {
+  const grid = $('#proofgrid'); grid.innerHTML = '';
+  const outs = [];
+  for (const [pid, P] of Object.entries(PERSONAS)) {
+    const q = preset.q[pid], pr = E.parse(q);
+    const res = E.execute(pr.plan), fp = E.fingerprint(pr.plan);
+    outs.push({ fp, json: JSON.stringify(res.groups.map(g => [g.key, g.value])) });
+    const M = E.METRICS[pr.plan.metric];
+    const col = el('div', { class: 'pcol' });
+    col.innerHTML = `<h3>${P.label}</h3><p class="said">“${escH(q)}”</p>
+      <div><span class="pill">“${escH(pr.matched)}” → ${escH(M.label)}</span><span class="pill">${escH(E.DIMS[pr.plan.dimension].label)}</span><span class="pill">${escH(pr.plan.period.from)} to ${escH(pr.plan.period.to)}</span></div>
+      <table style="margin-top:8px"><tbody>${res.groups.map(g => `<tr><td>${escH(g.key)}</td><td class="num">${E.fmt(pr.plan.metric, g.value)}</td></tr>`).join('')}</tbody></table>
+      <div class="fp">plan ${fp}</div>`;
+    grid.appendChild(col);
+  }
+  const same = outs.every(o => o.fp === outs[0].fp && o.json === outs[0].json);
+  const v = $('#verdict');
+  v.className = 'verdict' + (same ? '' : ' fail');
+  v.textContent = same ? `Three phrasings, one plan (${outs[0].fp}), identical results for every row.` : 'Plans differ — check the synonyms in the metric catalog.';
+  const rc = E.rawComparisons('2026-07-01', '2026-09-30')[preset.raw];
+  const M = E.METRICS[rc.metric];
+  $('#rawtitle').textContent = `The same question asked of each source system${preset.raw === 'doi' ? ' (30 Sep 2026 snapshot)' : ', Q3 2026'}`;
+  $('#raw').innerHTML = rc.sources.map(([sys, def, val]) => `<div class="row"><b>${escH(sys)}</b><span class="def muted">${escH(def)}</span><span class="v">${E.fmt(rc.metric, val)}<span class="delta">${diff(rc.metric, val, rc.canonical)}</span></span></div>`).join('') +
+    `<div class="row canon"><b>Governed metric</b><span class="def">${escH(M.definition)}</span><span class="v">${E.fmt(rc.metric, rc.canonical)}</span></div>`;
+}
+function diff(id, v, c) { const u = E.METRICS[id].unit; const d = v - c; const s = d >= 0 ? '+' : '−'; return u === '%' ? s + Math.abs(d).toFixed(1) + ' pts' : u === '$' ? s + '$' + Math.abs(d).toFixed(2) : s + Math.abs(d).toFixed(1) + ' days'; }
+
+// ---------- ontology ----------
+function renderOntology() {
+  const xs = [80, 230, 380, 530, 680, 830], y = 60, w = 116, h = 40;
+  let s = `<svg viewBox="0 0 910 360" role="img" aria-label="Ontology diagram: Supplier supplies Part, Part is stocked at Plant, Plant dispatches Shipment, Shipment fulfils Order, Order is placed by Customer">`;
+  s += `<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--ink)"/></marker></defs>`;
+  E.RELS.forEach((r, i) => { const x1 = xs[i] + w / 2, x2 = xs[i + 1] - w / 2; s += `<path class="rel" d="M${x1} ${y}H${x2 - 2}" marker-end="url(#ar)"/><text class="rlab" x="${(x1 + x2) / 2}" y="${y - 30}" text-anchor="middle">${r.label}</text><text class="rlab" x="${(x1 + x2) / 2}" y="${y + 36}" text-anchor="middle">${r.card.replace(' via Inventory', '')}</text>`; });
+  const H = [['Supplier', ['Country']], ['Part', ['Category']], ['Plant', ['Region']], ['Shipment', ['Carrier', 'Mode']], ['Order', ['Day', 'Month', 'Quarter']], ['Customer', ['Segment', 'Region']]];
+  H.forEach(([ent, levels]) => { const x = xs[E.CHAIN.indexOf(ent)]; let py = y + h / 2; levels.forEach((lv, j) => { const ly = 150 + j * 58; s += `<path class="hrel" d="M${x} ${py}V${ly - 15}"/><g class="hier"><rect x="${x - 46}" y="${ly - 15}" width="92" height="30" rx="4"/><text x="${x}" y="${ly + 5}" text-anchor="middle">${lv}</text></g>`; py = ly + 15; }); });
+  s += `<path class="hrel" d="M${xs[3] + 58} ${y + 12}C${xs[3] + 120} ${y + 40},${xs[3] + 120} 300,${xs[3] + 80} 318"/><g class="hier"><rect x="${xs[3] + 20}" y="305" width="120" height="30" rx="4"/><text x="${xs[3] + 80}" y="325" text-anchor="middle">IoT reading</text></g>`;
+  s += `<g class="hier"><rect x="${(xs[1] + xs[2]) / 2 - 44}" y="${y + 50}" width="88" height="26" rx="4"/><text x="${(xs[1] + xs[2]) / 2}" y="${y + 68}" text-anchor="middle">Inventory</text></g>`;
+  E.CHAIN.forEach((ent, i) => { s += `<g class="ent" data-ent="${ent}" tabindex="0" role="button" aria-label="${ent} details"><rect x="${xs[i] - w / 2}" y="${y - h / 2}" width="${w}" height="${h}" rx="4"/><text x="${xs[i]}" y="${y + 6}" text-anchor="middle">${ent}</text></g>`; });
+  s += '</svg>';
+  $('#svgwrap').innerHTML = s;
+  $('#svgwrap').querySelectorAll('.ent').forEach(g => { const go = () => selectEnt(g.dataset.ent); g.addEventListener('click', go); g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }); });
+  selectEnt('Supplier');
+}
+function selectEnt(ent) {
+  $('#svgwrap').querySelectorAll('.ent').forEach(g => g.classList.toggle('sel', g.dataset.ent === ent));
+  const e = E.ENTITIES[ent];
+  const metrics = E.PRIORITY.filter(id => E.METRICS[id].entities.includes(ent) || E.METRICS[id].dims.some(dm => E.DIMS[dm].entity === ent)).map(id => E.METRICS[id].label);
+  const rels = E.RELS.filter(r => r.from === ent || r.to === ent).map(r => `${r.from} ${r.label} ${r.to} (${r.card})`);
+  $('#entdetail').innerHTML = `<h3>${ent}</h3><p style="margin:4px 0 0">${escH(e.desc)}</p>
+    <h4>Key and attributes</h4><ul><li><code>${e.key}</code> (canonical key)</li>${e.attrs.map(a => `<li><code>${a}</code></li>`).join('')}</ul>
+    <h4>Hierarchy</h4><p style="margin:0;font-size:14.5px">${escH(e.hierarchy)}</p>
+    <h4>Relationships</h4><ul>${rels.map(r => `<li>${escH(r)}</li>`).join('')}</ul>
+    <h4>Mapped from source systems</h4><ul>${e.sources.map(([sys, col]) => `<li>${escH(sys)}: <code>${escH(col)}</code></li>`).join('')}</ul>
+    <h4>Metrics that use it</h4><p style="margin:0;font-size:14.5px">${escH(metrics.join(', '))}</p>`;
+}
+
+// ---------- metrics / governance / why ----------
+function renderMetrics() {
+  $('#mtable').innerHTML = `<thead><tr><th>Metric</th><th>Definition</th><th>Grain</th><th>Owner</th><th>Version</th><th>Sliceable by</th><th>Team vocabulary</th><th>Status</th></tr></thead><tbody>` +
+    E.PRIORITY.map(id => { const M = E.METRICS[id]; return `<tr><td>${escH(M.label)}</td><td>${escH(M.definition)}</td><td>${escH(M.grain)}</td><td>${escH(M.owner)}</td><td>v${M.version}</td><td>${M.dims.length === Object.keys(E.DIMS).length ? 'All dimensions' : escH(M.dims.map(d => E.DIMS[d].label).join(', '))}</td><td>${escH(M.synonyms.map(s => s[0]).join(', '))}</td><td class="status">Certified</td></tr>`; }).join('') + '</tbody>';
+  $('#policies').innerHTML = E.POLICIES.map(p => `<div class="policy"><h3>${p.id} ${escH(p.name)}</h3><p>${escH(p.text)}</p></div>`).join('');
+  const sel = $('#linsel');
+  E.PRIORITY.forEach(id => sel.appendChild(el('option', { value: id }, E.METRICS[id].label)));
+  sel.onchange = renderLineage; renderLineage();
+  const rc = E.rawComparisons('2026-07-01', '2026-09-30');
+  $('#whytable').innerHTML = '<thead><tr><th>Question</th><th>Source system and its definition</th><th>Answer</th></tr></thead><tbody>' +
+    Object.values(rc).map(c => { const M = E.METRICS[c.metric]; return c.sources.map(([sys, def, v], i) => `<tr><td>${i === 0 ? '<b>' + escH(M.label) + '</b>' : ''}</td><td>${escH(sys)}: ${escH(def)}</td><td>${E.fmt(c.metric, v)}</td></tr>`).join('') + `<tr><td></td><td style="color:var(--ok);font-weight:600">Governed metric v${M.version}</td><td style="color:var(--ok);font-weight:600">${E.fmt(c.metric, c.canonical)}</td></tr>`; }).join('') + '</tbody>';
+  $('#xwalk').innerHTML = '<thead><tr><th>Supplier entity</th><th>ERP LIFNR</th><th>Supplier portal code</th><th>TMS shipper name</th></tr></thead><tbody>' +
+    E.SUPPLIERS.map(s => `<tr><td><b>${s.id}</b> ${escH(s.name)}</td><td><code>${s.erp}</code></td><td><code>${s.portal}</code></td><td>${escH(s.tms)}</td></tr>`).join('') + '</tbody>';
+  $('#datanote').textContent = `${E.FACT.length} synthetic order lines (1 Jan – 30 Sep 2026) across ${E.SUPPLIERS.length} suppliers, ${E.PARTS.length} parts, ${E.PLANTS.length} plants, ${E.CARRIERS.length} carriers and ${E.CUSTOMERS.length} customers, plus a ${E.INVENTORY.length}-position inventory snapshot. Generated from a fixed seed, so every visitor sees the same numbers.`;
+  $('#foot').innerHTML = 'Throughline prototype. Synthetic data; the same semantic model runs server-side on DuckDB in the companion repository. Built by Baskarraj S N.';
+}
+function renderLineage() {
+  const id = $('#linsel').value, M = E.METRICS[id];
+  const src = { Supplier: 'Supplier portal, ERP', Part: 'ERP material master', Plant: 'ERP, WMS', Shipment: 'TMS, IoT telemetry', Order: 'ERP / OMS', Customer: 'CRM' };
+  const ents = id === 'doi' ? ['Part', 'Plant'] : M.entities;
+  const sources = [...new Set(ents.flatMap(e => src[e].split(', ')))].concat(id === 'doi' ? ['WMS snapshot'] : []);
+  $('#lineage').innerHTML = sources.map(s => `<span>${escH(s)}</span>`).join('') + '<em>→</em><span>staging + key crosswalk</span><em>→</em>' + ents.map(e => `<span>${e}</span>`).join('') + `<em>→</em><span><code>${M.view}</code></span><em>→</em><span><b>${escH(M.label)}</b> v${M.version}</span>`;
+}
+function renderAudit() {
+  $('#audit').innerHTML = '<thead><tr><th>Time</th><th>Persona</th><th>Question</th><th>Resolved to</th><th>Fingerprint</th></tr></thead><tbody>' +
+    (audit.length ? audit.map(a => `<tr><td>${a.time.toTimeString().slice(0, 8)}</td><td>${a.persona}</td><td>${escH(a.question)}</td><td>${escH(a.outcome)}</td><td><code>${a.fp}</code></td></tr>`).join('') : '<tr><td colspan="5" class="muted">No questions yet. Ask one on the Ask tab and it appears here.</td></tr>') + '</tbody>';
+}
+
+renderChips(); renderGlossary(); renderProof(); renderOntology(); renderMetrics();
+setPersona('planning');
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Throughline API + UI",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["throughline.api:app", "--reload", "--port", "8000"],
+      "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+      "jinja": true
+    },
+    {
+      "name": "Run tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["-q"],
+      "env": { "PYTHONPATH": "${workspaceFolder}/src" }
+    }
+  ]
+}

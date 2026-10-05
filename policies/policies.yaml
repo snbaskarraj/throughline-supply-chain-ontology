@@ -1,0 +1,25 @@
+policies:
+- id: POL-01
+  name: Certified metrics only
+  text: Answers are computed only from metrics with a certified definition, owner and version. Unknown or uncertified terms
+    are refused with alternatives, never guessed.
+- id: POL-02
+  name: Ontology-valid slicing
+  text: A metric can only be sliced by entities connected to it in the ontology. Days of inventory cannot be split by customer
+    or carrier, because inventory is not related to them.
+- id: POL-03
+  name: Contract price masking
+  text: Supplier unit prices are visible to Procurement only. Other personas see them masked in record views. Aggregated metric
+    values are unaffected.
+- id: POL-04
+  name: Small-sample flag
+  text: Any group built from fewer than 5 records is flagged as low confidence rather than presented as a firm number.
+- id: POL-05
+  name: Plan fingerprint and audit
+  text: Every answer records persona, question, resolved plan and a fingerprint of that plan. The persona is not part of the
+    fingerprint, so equal fingerprints prove equal logic.
+masking:
+  dim_part.unit_cost:
+    visible_to:
+    - procurement
+min_group_size: 5

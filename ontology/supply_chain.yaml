@@ -1,0 +1,188 @@
+# Canonical semantic model. The browser engine (web/engine.js) embeds the same model;
+# tests/test_parity.py fails CI if the two ever disagree.
+ontology: supply_chain
+version: 1.0.0
+chain:
+- Supplier
+- Part
+- Plant
+- Shipment
+- Order
+- Customer
+entities:
+  Supplier:
+    key: supplier_id
+    desc: A company that supplies parts.
+    attrs:
+    - supplier_name
+    - country
+    - tier
+    hierarchy: Supplier → Country
+    sources:
+    - - ERP vendor master
+      - LIFNR
+    - - Supplier portal
+      - vendor_code
+    - - TMS
+      - shipper_name (free text)
+  Part:
+    key: part_id
+    desc: A purchased component or material.
+    attrs:
+    - part_name
+    - category
+    - unit_cost
+    hierarchy: Part → Category
+    sources:
+    - - ERP material master
+      - MATNR
+    - - Supplier portal
+      - supplier_sku
+  Plant:
+    key: plant_id
+    desc: A site that stocks parts and dispatches shipments.
+    attrs:
+    - plant_name
+    - country
+    - region
+    hierarchy: Plant → Region
+    sources:
+    - - ERP
+      - WERKS
+    - - WMS
+      - site_code
+    - - TMS
+      - origin_location
+  Shipment:
+    key: shipment_id
+    desc: A physical movement that fulfils an order line.
+    attrs:
+    - ship_date
+    - delivered_date
+    - qty_shipped
+    - carrier
+    - mode
+    - freight_cost
+    - duty_cost
+    - iot_excursion
+    hierarchy: Carrier → Mode
+    sources:
+    - - TMS
+      - load_id
+    - - IoT telemetry
+      - tracker_id → load_id
+    - - ERP
+      - delivery document (VBELN)
+  Order:
+    key: order_id
+    desc: A customer order line for a part from a plant.
+    attrs:
+    - order_date
+    - promised_date
+    - qty_ordered
+    hierarchy: Day → Month → Quarter
+    sources:
+    - - ERP / OMS
+      - VBAP (order line)
+    - - Planning spreadsheet
+      - order_ref
+  Customer:
+    key: customer_id
+    desc: The account that places orders.
+    attrs:
+    - customer_name
+    - segment
+    - region
+    hierarchy: Customer → Segment, Region
+    sources:
+    - - CRM
+      - account_id
+    - - ERP
+      - KUNNR
+relationships:
+- from: Supplier
+  to: Part
+  label: supplies
+  card: '1 : N'
+- from: Part
+  to: Plant
+  label: stocked at
+  card: 'N : M via Inventory'
+- from: Plant
+  to: Shipment
+  label: dispatches
+  card: '1 : N'
+- from: Shipment
+  to: Order
+  label: fulfils
+  card: 'N : 1'
+- from: Order
+  to: Customer
+  label: placed by
+  card: 'N : 1'
+hierarchies:
+  Supplier:
+  - supplier
+  - country
+  Part:
+  - part
+  - category
+  Plant:
+  - plant
+  - region
+  Shipment:
+  - carrier
+  - mode
+  Order:
+  - day
+  - month
+  - quarter
+  Customer:
+  - customer
+  - segment
+  - region
+dimensions:
+  supplier:
+    label: Supplier
+    entity: Supplier
+    column: sup.supplier_name
+  part:
+    label: Part
+    entity: Part
+    column: pt.part_name
+  category:
+    label: Part category
+    entity: Part
+    column: pt.category
+  plant:
+    label: Plant
+    entity: Plant
+    column: pl.plant_name
+  region:
+    label: Plant region
+    entity: Plant
+    column: pl.region
+  customer:
+    label: Customer
+    entity: Customer
+    column: c.customer_name
+  segment:
+    label: Customer segment
+    entity: Customer
+    column: c.segment
+  carrier:
+    label: Carrier
+    entity: Shipment
+    column: COALESCE(s.carrier_name, '(not yet shipped)')
+  mode:
+    label: Transport mode
+    entity: Shipment
+    column: COALESCE(s.transport_mode, '(not yet shipped)')
+  month:
+    label: Month
+    entity: Order
+    column: STRFTIME(o.order_date, '%Y-%m')
+  quarter:
+    label: Quarter
+    entity: Order
+    column: STRFTIME(o.order_date, '%Y') || '-Q' || QUARTER(o.order_date)

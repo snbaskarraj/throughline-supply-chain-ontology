@@ -1,0 +1,9 @@
+---
+description: How this repo is organised and the rules any change must respect
+alwaysApply: true
+---
+- The canonical model lives in `ontology/supply_chain.yaml`, `semantic/metrics.yaml` and `policies/policies.yaml`.
+- `web/engine.js` embeds the same model for the browser prototype. If you change a metric, dimension or synonym, change both, then run `python web/build.py` and `python -m pytest -q`. `tests/test_parity.py` fails if they drift.
+- The LLM path must never generate SQL. Routers produce a `Plan`; `semantic_layer.compile_sql` is the only SQL writer.
+- Never edit `web/index.html` by hand; it is built from `web/index.src.html` + `web/engine.js`.
+- Persona must never be an input to `fingerprint()`.

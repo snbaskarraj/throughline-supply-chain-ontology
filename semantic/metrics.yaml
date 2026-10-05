@@ -1,0 +1,383 @@
+# Canonical semantic model. The browser engine (web/engine.js) embeds the same model;
+# tests/test_parity.py fails CI if the two ever disagree.
+metrics:
+  excursion:
+    label: Condition excursion rate
+    unit: '%'
+    better: lower
+    total: false
+    view: sc_fulfilment
+    owner: Head of Quality
+    steward: Quality
+    version: '1.0'
+    certified: '2026-08-19'
+    definition: Share of delivered shipments where IoT trackers recorded a temperature or shock excursion.
+    grain: Shipment
+    time_anchor: Order date
+    entities:
+    - Shipment
+    - Order
+    dimensions:
+    - supplier
+    - part
+    - category
+    - plant
+    - region
+    - customer
+    - segment
+    - carrier
+    - mode
+    - month
+    - quarter
+    where:
+    sql: 100.0 * SUM(CASE WHEN s.iot_excursion THEN 1 ELSE 0 END) / NULLIF(COUNT(s.delivered_date), 0)
+    synonyms:
+    - phrase: excursion
+      persona: all
+    - phrase: excursions
+      persona: all
+    - phrase: temperature
+      persona: logistics
+    - phrase: cold chain
+      persona: logistics
+    - phrase: condition breach
+      persona: all
+    - phrase: iot alert
+      persona: logistics
+  late_count:
+    label: Late deliveries
+    unit: count
+    better: lower
+    total: true
+    view: sc_fulfilment
+    owner: Head of Logistics Excellence
+    steward: Logistics
+    version: '2.1'
+    certified: '2026-07-14'
+    definition: Number of delivered order lines whose delivered date is after the promised date. Complement of on-time delivery.
+    grain: Order line
+    time_anchor: Order date
+    entities:
+    - Shipment
+    - Order
+    dimensions:
+    - supplier
+    - part
+    - category
+    - plant
+    - region
+    - customer
+    - segment
+    - carrier
+    - mode
+    - month
+    - quarter
+    where:
+    sql: SUM(CASE WHEN s.delivered_date > o.promised_date THEN 1 ELSE 0 END)
+    synonyms:
+    - phrase: late shipments
+      persona: all
+    - phrase: late deliveries
+      persona: all
+    - phrase: late orders
+      persona: all
+    - phrase: delayed shipments
+      persona: all
+    - phrase: late
+      persona: all
+  otd:
+    label: On-time delivery
+    unit: '%'
+    better: higher
+    total: false
+    view: sc_fulfilment
+    owner: Head of Logistics Excellence
+    steward: Logistics
+    version: '2.1'
+    certified: '2026-07-14'
+    definition: Share of delivered order lines whose delivered date is on or before the promised date. In-transit lines are
+      excluded until delivered.
+    grain: Order line
+    time_anchor: Order date
+    entities:
+    - Shipment
+    - Order
+    dimensions:
+    - supplier
+    - part
+    - category
+    - plant
+    - region
+    - customer
+    - segment
+    - carrier
+    - mode
+    - month
+    - quarter
+    where:
+    sql: 100.0 * SUM(CASE WHEN s.delivered_date <= o.promised_date THEN 1 ELSE 0 END) / NULLIF(COUNT(s.delivered_date), 0)
+    synonyms:
+    - phrase: on-time delivery
+      persona: all
+    - phrase: on time delivery
+      persona: all
+    - phrase: otd
+      persona: all
+    - phrase: on-time
+      persona: all
+    - phrase: on time
+      persona: all
+    - phrase: service level
+      persona: planning
+    - phrase: supplier punctuality
+      persona: procurement
+    - phrase: punctuality
+      persona: procurement
+    - phrase: delivery performance
+      persona: logistics
+  fill_rate:
+    label: Fill rate
+    unit: '%'
+    better: higher
+    total: false
+    view: sc_fulfilment
+    owner: Head of Demand & Supply Planning
+    steward: Planning
+    version: '1.4'
+    certified: '2026-06-30'
+    definition: Units shipped divided by units ordered, for order lines whose promised date has passed. Unshipped units on
+      overdue lines count as unfilled.
+    grain: Order line
+    time_anchor: Order date
+    entities:
+    - Shipment
+    - Order
+    dimensions:
+    - supplier
+    - part
+    - category
+    - plant
+    - region
+    - customer
+    - segment
+    - carrier
+    - mode
+    - month
+    - quarter
+    where: o.promised_date <= DATE '2026-09-30'
+    sql: 100.0 * SUM(COALESCE(s.qty_shipped, 0)) / NULLIF(SUM(o.qty_ordered), 0)
+    synonyms:
+    - phrase: fill rate
+      persona: all
+    - phrase: fill-rate
+      persona: all
+    - phrase: unit fill
+      persona: planning
+    - phrase: fulfilment rate
+      persona: all
+    - phrase: fulfillment rate
+      persona: all
+  doi:
+    label: Days of inventory
+    unit: days
+    better: neutral
+    total: false
+    view: sc_inventory
+    owner: Head of Demand & Supply Planning
+    steward: Planning
+    version: '2.0'
+    certified: '2026-07-01'
+    definition: Inventory value on hand divided by average daily cost of goods shipped over the trailing 90 days. Snapshot
+      as of 30 Sep 2026.
+    grain: Plant × Part
+    time_anchor: Snapshot date
+    entities:
+    - Part
+    - Plant
+    dimensions:
+    - supplier
+    - part
+    - category
+    - plant
+    - region
+    where:
+    sql: SUM(i.on_hand * pt.unit_cost) / NULLIF(SUM(cogs.cogs_90d) / 90.0, 0)
+    synonyms:
+    - phrase: days of inventory
+      persona: all
+    - phrase: days of supply
+      persona: planning
+    - phrase: doi
+      persona: all
+    - phrase: inventory cover
+      persona: planning
+    - phrase: stock cover
+      persona: planning
+    - phrase: days on hand
+      persona: all
+    - phrase: inventory days
+      persona: all
+  landed_cost:
+    label: Landed cost per unit
+    unit: $
+    better: lower
+    total: false
+    view: sc_fulfilment
+    owner: Head of Strategic Sourcing
+    steward: Procurement
+    version: '3.0'
+    certified: '2026-08-02'
+    definition: Purchase price plus freight plus import duty, divided by units shipped.
+    grain: Shipment
+    time_anchor: Order date
+    entities:
+    - Part
+    - Shipment
+    - Order
+    dimensions:
+    - supplier
+    - part
+    - category
+    - plant
+    - region
+    - customer
+    - segment
+    - carrier
+    - mode
+    - month
+    - quarter
+    where: s.qty_shipped > 0
+    sql: (SUM(s.qty_shipped * pt.unit_cost) + SUM(s.freight_cost) + SUM(s.duty_cost)) / NULLIF(SUM(s.qty_shipped), 0)
+    synonyms:
+    - phrase: landed cost
+      persona: all
+    - phrase: total landed cost
+      persona: procurement
+    - phrase: unit landed cost
+      persona: procurement
+    - phrase: all-in cost
+      persona: procurement
+    - phrase: cost per unit
+      persona: all
+  freight_cost:
+    label: Freight cost
+    unit: $
+    better: lower
+    total: true
+    view: sc_fulfilment
+    owner: Head of Logistics Excellence
+    steward: Logistics
+    version: '1.2'
+    certified: '2026-05-21'
+    definition: Total carrier freight charged on shipments, excluding duty.
+    grain: Shipment
+    time_anchor: Order date
+    entities:
+    - Shipment
+    - Order
+    dimensions:
+    - supplier
+    - part
+    - category
+    - plant
+    - region
+    - customer
+    - segment
+    - carrier
+    - mode
+    - month
+    - quarter
+    where:
+    sql: SUM(s.freight_cost)
+    synonyms:
+    - phrase: freight cost
+      persona: all
+    - phrase: freight spend
+      persona: logistics
+    - phrase: shipping cost
+      persona: all
+    - phrase: transport cost
+      persona: logistics
+    - phrase: freight
+      persona: all
+  lead_time:
+    label: Order-to-delivery lead time
+    unit: days
+    better: lower
+    total: false
+    view: sc_fulfilment
+    owner: Head of Logistics Excellence
+    steward: Logistics
+    version: '1.1'
+    certified: '2026-05-21'
+    definition: Average calendar days from order date to delivered date, for delivered lines.
+    grain: Order line
+    time_anchor: Order date
+    entities:
+    - Shipment
+    - Order
+    dimensions:
+    - supplier
+    - part
+    - category
+    - plant
+    - region
+    - customer
+    - segment
+    - carrier
+    - mode
+    - month
+    - quarter
+    where:
+    sql: AVG(DATE_DIFF('day', o.order_date, s.delivered_date))
+    synonyms:
+    - phrase: lead time
+      persona: all
+    - phrase: cycle time
+      persona: planning
+    - phrase: order to delivery
+      persona: all
+    - phrase: order-to-delivery
+      persona: all
+    - phrase: transit time
+      persona: logistics
+  order_lines:
+    label: Order lines
+    unit: count
+    better: neutral
+    total: true
+    view: sc_fulfilment
+    owner: Head of Demand & Supply Planning
+    steward: Planning
+    version: '1.0'
+    certified: '2026-04-10'
+    definition: Count of customer order lines.
+    grain: Order line
+    time_anchor: Order date
+    entities:
+    - Order
+    dimensions:
+    - supplier
+    - part
+    - category
+    - plant
+    - region
+    - customer
+    - segment
+    - carrier
+    - mode
+    - month
+    - quarter
+    where:
+    sql: COUNT(*)
+    synonyms:
+    - phrase: order lines
+      persona: all
+    - phrase: number of orders
+      persona: all
+    - phrase: order count
+      persona: all
+    - phrase: orders
+      persona: all
+    - phrase: order volume
+      persona: all
