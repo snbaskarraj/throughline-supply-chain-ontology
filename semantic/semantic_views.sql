@@ -22,8 +22,17 @@ CREATE OR REPLACE SEMANTIC VIEW sc_fulfilment
     order_placed_by        AS orders (customer_id)   REFERENCES customers
   )
   FACTS (
-    shipments.is_delivered AS CASE WHEN delivered_date IS NOT NULL THEN 1 ELSE 0 END,
-    shipments.landed_value AS qty_shipped * parts.unit_cost + freight_cost + duty_cost
+    -- Physical columns of another logical table are not visible until declared here.
+    parts.unit_price AS unit_cost,
+    orders.ordered_qty AS qty_ordered,
+    orders.promised_on AS promised_date,
+    orders.ordered_on AS order_date,
+    shipments.shipped_qty AS qty_shipped,
+    shipments.freight_amount AS freight_cost,
+    shipments.duty_amount AS duty_cost,
+    shipments.delivered_on AS delivered_date,
+    shipments.excursion_flag AS IFF(iot_excursion, 1, 0),
+    shipments.landed_value AS qty_shipped * orders.unit_price + freight_cost + duty_cost
   )
   DIMENSIONS (
     suppliers.supplier AS supplier_name  WITH SYNONYMS = ('vendor'),
@@ -38,20 +47,20 @@ CREATE OR REPLACE SEMANTIC VIEW sc_fulfilment
     orders.order_month AS DATE_TRUNC('month', order_date)
   )
   METRICS (
-    shipments.otd_pct AS 100.0 * SUM(CASE WHEN shipments.delivered_date <= orders.promised_date THEN 1 ELSE 0 END) / NULLIF(COUNT(shipments.delivered_date), 0)
+    shipments.otd_pct AS 100.0 * SUM(CASE WHEN shipments.delivered_on <= orders.promised_on THEN 1 ELSE 0 END) / NULLIF(COUNT(shipments.delivered_on), 0)
       WITH SYNONYMS = ('on-time delivery', 'service level', 'supplier punctuality', 'delivery performance')
-      COMMENT = 'Certified v2.1 · owner Head of Logistics Excellence',
-    orders.fill_rate_pct AS 100.0 * SUM(COALESCE(shipments.qty_shipped, 0)) / NULLIF(SUM(orders.qty_ordered), 0)
+      COMMENT = 'Certified v2.1, owner Head of Logistics Excellence',
+    orders.fill_rate_pct AS 100.0 * SUM(shipments.shipped_qty) / NULLIF(SUM(orders.ordered_qty), 0)
       WITH SYNONYMS = ('unit fill', 'fulfilment rate')
-      COMMENT = 'Certified v1.4 · lines with promised_date <= as-of only',
-    shipments.landed_cost_per_unit AS SUM(shipments.landed_value) / NULLIF(SUM(shipments.qty_shipped), 0)
+      COMMENT = 'Certified v1.4, lines with promised_date <= as-of only',
+    shipments.landed_cost_per_unit AS SUM(shipments.landed_value) / NULLIF(SUM(shipments.shipped_qty), 0)
       WITH SYNONYMS = ('landed cost', 'cost per unit', 'all-in cost')
-      COMMENT = 'Certified v3.0 · purchase price + freight + duty',
-    shipments.freight_cost AS SUM(shipments.freight_cost) COMMENT = 'Certified v1.2',
-    shipments.lead_time_days AS AVG(DATEDIFF('day', orders.order_date, shipments.delivered_date)) COMMENT = 'Certified v1.1',
-    shipments.excursion_pct AS 100.0 * SUM(IFF(shipments.iot_excursion, 1, 0)) / NULLIF(COUNT(shipments.delivered_date), 0) COMMENT = 'Certified v1.0',
-    shipments.late_deliveries AS SUM(CASE WHEN shipments.delivered_date > orders.promised_date THEN 1 ELSE 0 END) COMMENT = 'Certified v2.1',
-    orders.order_lines AS COUNT(orders.order_id) COMMENT = 'Certified v1.0'
+      COMMENT = 'Certified v3.0, purchase price + freight + duty',
+    shipments.freight_cost AS SUM(shipments.freight_amount) COMMENT = 'Certified v1.2',
+    shipments.lead_time_days AS AVG(DATEDIFF('day', orders.ordered_on, shipments.delivered_on)) COMMENT = 'Certified v1.1',
+    shipments.excursion_pct AS 100.0 * SUM(shipments.excursion_flag) / NULLIF(COUNT(shipments.delivered_on), 0) COMMENT = 'Certified v1.0',
+    shipments.late_deliveries AS SUM(CASE WHEN shipments.delivered_on > orders.promised_on THEN 1 ELSE 0 END) COMMENT = 'Certified v2.1',
+    orders.order_lines AS COUNT(order_id) COMMENT = 'Certified v1.0'
   )
   COMMENT = 'Supply chain fulfilment semantic view, grounded in the Throughline ontology';
 
@@ -67,9 +76,15 @@ CREATE OR REPLACE SEMANTIC VIEW sc_inventory
     inv_part AS inv (part_id) REFERENCES parts, inv_plant AS inv (plant_id) REFERENCES plants,
     part_supplier AS parts (supplier_id) REFERENCES suppliers, inv_cogs AS inv (plant_id, part_id) REFERENCES cogs
   )
+  FACTS (
+    parts.unit_price AS unit_cost,
+    inv.on_hand_qty AS on_hand,
+    inv.inventory_value AS on_hand * parts.unit_price,
+    cogs.cogs_amount AS cogs_90d
+  )
   DIMENSIONS (suppliers.supplier AS supplier_name, parts.part AS part_name, parts.category AS category, plants.plant AS plant_name, plants.region AS region)
   METRICS (
-    inv.days_of_inventory AS SUM(inv.on_hand * parts.unit_cost) / NULLIF(SUM(cogs.cogs_90d) / 90.0, 0)
+    inv.days_of_inventory AS SUM(inv.inventory_value) / NULLIF(SUM(cogs.cogs_amount) / 90.0, 0)
       WITH SYNONYMS = ('days of supply', 'inventory cover', 'days on hand') COMMENT = 'Certified v2.0'
   );
 
